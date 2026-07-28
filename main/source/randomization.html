@@ -61,7 +61,7 @@
     <link rel="prev" title="Events" href="events.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-    <meta name="docbuild:last-update" content="Jul 10, 2026"/>
+    <meta name="docbuild:last-update" content="Jul 28, 2026"/>
   </head>
   
   
@@ -803,6 +803,26 @@ triggers <code class="docutils literal notranslate"><span class="pre">set_const_
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dr.light_dir</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">light_dir</span></code></p></td>
 <td><p>Light direction vector</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dr.light_diffuse</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">light_diffuse</span></code></p></td>
+<td><p>Diffuse RGB color</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dr.light_specular</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">light_specular</span></code></p></td>
+<td><p>Specular RGB color</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dr.light_ambient</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">light_ambient</span></code></p></td>
+<td><p>Ambient RGB color</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dr.light_attenuation</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">light_attenuation</span></code></p></td>
+<td><p>Constant, linear, and quadratic attenuation coefficients</p></td>
 <td></td>
 </tr>
 </tbody>
@@ -1909,7 +1929,8 @@ automatically.</p>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">set_const_0</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">dof_invweight0</span></code>, <code class="docutils literal notranslate"><span class="pre">body_invweight0</span></code>, <code class="docutils literal notranslate"><span class="pre">tendon_length0</span></code>,
-<code class="docutils literal notranslate"><span class="pre">tendon_invweight0</span></code>, plus camera and light references</p></td>
+<code class="docutils literal notranslate"><span class="pre">tendon_invweight0</span></code>, <code class="docutils literal notranslate"><span class="pre">actuator_acc0</span></code>, plus camera and light
+references</p></td>
 <td><p>After changing <code class="docutils literal notranslate"><span class="pre">dof_armature</span></code>, <code class="docutils literal notranslate"><span class="pre">tendon_armature</span></code>,
 <code class="docutils literal notranslate"><span class="pre">body_inertia</span></code>, <code class="docutils literal notranslate"><span class="pre">body_pos</span></code>, <code class="docutils literal notranslate"><span class="pre">body_quat</span></code>, or <code class="docutils literal notranslate"><span class="pre">qpos0</span></code></p></td>
 </tr>
@@ -2187,7 +2208,7 @@ By The mjlab Developers
   
   <div class="footer-item">
     <p class="last-updated">
-  Last updated on Jul 10, 2026.
+  Last updated on Jul 28, 2026.
   <br/>
 </p>
   </div>
