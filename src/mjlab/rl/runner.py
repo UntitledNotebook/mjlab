@@ -95,9 +95,13 @@ class MjlabOnPolicyRunner(OnPolicyRunner):
       -> obs_normalizer.*) to the current format (rsl-rl>=4.0).
     """
     loaded_dict = torch.load(path, map_location=map_location, weights_only=False)
+    return self._load_checkpoint(loaded_dict, load_cfg, strict)
 
+  def _load_checkpoint(
+    self, loaded_dict: dict, load_cfg: dict | None, strict: bool
+  ) -> dict:
     if "model_state_dict" in loaded_dict:
-      print(f"Detected legacy checkpoint at {path}. Migrating to new format...")
+      print("Detected legacy checkpoint. Migrating to new format...")
       model_state_dict = loaded_dict.pop("model_state_dict")
       actor_state_dict = {}
       critic_state_dict = {}

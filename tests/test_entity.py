@@ -550,6 +550,12 @@ def test_find_joints_by_actuator_names_preserves_natural_order(device):
   # Verify this differs from actuator order (which is reverse).
   assert list(robot.actuator_names) == ["act_c", "act_b", "act_a"]
 
+  ids, names = robot.find_joints_by_actuator_names(
+    ("joint_c", "joint_a"), preserve_order=True
+  )
+  assert ids == [2, 0]
+  assert names == ["joint_c", "joint_a"]
+
 
 def test_ctrl_ids_follow_natural_joint_order(device):
   """Test that entity.indexing.ctrl_ids are in actuator definition order.

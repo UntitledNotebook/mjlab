@@ -605,8 +605,12 @@ class MotionCommand(CommandTerm):
 
 
 @dataclass(kw_only=True)
-class MotionCommandCfg(CommandTermCfg):
+class FileMotionCommandCfg(CommandTermCfg):
   motion_file: str
+
+
+@dataclass(kw_only=True)
+class MotionCommandCfg(FileMotionCommandCfg):
   anchor_body_name: str
   body_names: tuple[str, ...]
   entity_name: str

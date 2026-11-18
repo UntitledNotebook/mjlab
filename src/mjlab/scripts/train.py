@@ -14,7 +14,7 @@ from mjlab.envs import ManagerBasedRlEnv, ManagerBasedRlEnvCfg
 from mjlab.rl import MjlabOnPolicyRunner, RslRlBaseRunnerCfg, RslRlVecEnvWrapper
 from mjlab.scripts._cli import maybe_print_top_level_help
 from mjlab.tasks.registry import list_tasks, load_env_cfg, load_rl_cfg, load_runner_cls
-from mjlab.tasks.tracking.mdp import MotionCommandCfg
+from mjlab.tasks.tracking.mdp import FileMotionCommandCfg, MotionCommandCfg
 from mjlab.utils.gpu import select_gpus
 from mjlab.utils.os import dump_yaml, get_checkpoint_path, get_wandb_checkpoint_path
 from mjlab.utils.torch import configure_torch_backends
@@ -71,14 +71,8 @@ def run_train(task_id: str, cfg: TrainConfig, log_dir: Path) -> None:
   registry_name: str | None = None
 
   # Check if this is a tracking task by checking for motion command.
-  is_tracking_task = "motion" in cfg.env.commands and isinstance(
-    cfg.env.commands["motion"], MotionCommandCfg
-  )
-
-  if is_tracking_task:
-    motion_cmd = cfg.env.commands["motion"]
-    assert isinstance(motion_cmd, MotionCommandCfg)
-
+  motion_cmd = cfg.env.commands.get("motion")
+  if isinstance(motion_cmd, FileMotionCommandCfg):
     # Check if motion_file is already set (e.g., via CLI --env.commands.motion.motion-file).
     if motion_cmd.motion_file and Path(motion_cmd.motion_file).exists():
       print(f"[INFO] Using local motion file: {motion_cmd.motion_file}")
@@ -155,7 +149,7 @@ def run_train(task_id: str, cfg: TrainConfig, log_dir: Path) -> None:
     runner_cls = MjlabOnPolicyRunner
 
   runner_kwargs = {}
-  if is_tracking_task:
+  if isinstance(motion_cmd, MotionCommandCfg):
     runner_kwargs["registry_name"] = registry_name
 
   # Write config files before runner creation, since the runner mutates agent_cfg

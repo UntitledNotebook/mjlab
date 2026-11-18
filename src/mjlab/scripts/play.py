@@ -15,7 +15,8 @@ from mjlab.envs import ManagerBasedRlEnv
 from mjlab.rl import MjlabOnPolicyRunner, RslRlVecEnvWrapper
 from mjlab.scripts._cli import maybe_print_top_level_help
 from mjlab.tasks.registry import list_tasks, load_env_cfg, load_rl_cfg, load_runner_cls
-from mjlab.tasks.tracking.mdp import MotionCommandCfg
+from mjlab.tasks.scaletrack.motion import ScaleTrackMotionCfg
+from mjlab.tasks.tracking.mdp import FileMotionCommandCfg, MotionCommandCfg
 from mjlab.utils.os import get_wandb_checkpoint_path
 from mjlab.utils.torch import configure_torch_backends
 from mjlab.utils.wrappers import VideoRecorder
@@ -56,6 +57,14 @@ class PlayConfig:
   _demo_mode: tyro.conf.Suppress[bool] = False
 
 
+@dataclass(frozen=True)
+class ScaleTrackPlayConfig(PlayConfig):
+  mode_index: int = 7
+  """ScaleTrack tracking mode, from 0 (pelvis) to 7 (whole body)."""
+  local_tracking: bool = False
+  """Use the reference pelvis position for a mode that tracks the pelvis."""
+
+
 def run_play(task_id: str, cfg: PlayConfig):
   configure_torch_backends()
 
@@ -73,20 +82,17 @@ def run_play(task_id: str, cfg: PlayConfig):
     print("[INFO]: Terminations disabled")
 
   # Check if this is a tracking task by checking for motion command.
-  is_tracking_task = "motion" in env_cfg.commands and isinstance(
-    env_cfg.commands["motion"], MotionCommandCfg
-  )
+  motion_cmd = env_cfg.commands.get("motion")
+  if isinstance(cfg, ScaleTrackPlayConfig):
+    assert isinstance(motion_cmd, ScaleTrackMotionCfg)
+    motion_cmd.mode_index = cfg.mode_index
+    motion_cmd.local_tracking = cfg.local_tracking
 
-  if is_tracking_task and cfg._demo_mode:
+  if isinstance(motion_cmd, MotionCommandCfg) and cfg._demo_mode:
     # Demo mode: use uniform sampling to see more diversity with num_envs > 1.
-    motion_cmd = env_cfg.commands["motion"]
-    assert isinstance(motion_cmd, MotionCommandCfg)
     motion_cmd.sampling_mode = "uniform"
 
-  if is_tracking_task:
-    motion_cmd = env_cfg.commands["motion"]
-    assert isinstance(motion_cmd, MotionCommandCfg)
-
+  if isinstance(motion_cmd, FileMotionCommandCfg):
     # Check for local motion file first (works for both dummy and trained modes).
     if cfg.motion_file is not None and Path(cfg.motion_file).exists():
       print(f"[INFO]: Using local motion file: {cfg.motion_file}")
@@ -312,17 +318,16 @@ def main():
     config=mjlab.TYRO_FLAGS,
   )
 
-  # Parse the rest of the arguments + allow overriding env_cfg and agent_cfg.
-  agent_cfg = load_rl_cfg(chosen_task)
-
+  motion = load_env_cfg(chosen_task, play=True).commands.get("motion")
+  config_cls = (
+    ScaleTrackPlayConfig if isinstance(motion, ScaleTrackMotionCfg) else PlayConfig
+  )
   args = tyro.cli(
-    PlayConfig,
+    config_cls,
     args=remaining_args,
-    default=PlayConfig(),
     prog=sys.argv[0] + f" {chosen_task}",
     config=mjlab.TYRO_FLAGS,
   )
-  del remaining_args, agent_cfg
 
   run_play(chosen_task, args)
 

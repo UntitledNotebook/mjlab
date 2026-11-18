@@ -5,6 +5,13 @@ Changelog
 Upcoming version (not yet released)
 -----------------------------------
 
+Added
+^^^^^
+
+- Added the ScaleTrack G1 task with direct playback of ScaleBFM's pretrained XL
+  checkpoint and its 50 Hz motion files. See :ref:`scaletrack`.
+- Added per-clip training weights to ScaleTrack motion YAML files.
+
 Version 1.6.0 (August 8, 2026)
 ------------------------------
 
