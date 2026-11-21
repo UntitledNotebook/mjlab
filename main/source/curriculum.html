@@ -59,7 +59,7 @@
     <link rel="prev" title="Domain Randomization" href="randomization.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-    <meta name="docbuild:last-update" content="Aug 25, 2026"/>
+    <meta name="docbuild:last-update" content="Nov 21, 2026"/>
   </head>
   
   
@@ -196,6 +196,7 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="sensors/index.html">Sensors</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="sensors/raycast_sensor.html">RayCast Sensor</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sensors/rgbd_camera.html">RGB-D Camera</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sensors/tactile_sensor.html">Tactile Sensor</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="scene.html">Scene</a></li>
@@ -631,7 +632,11 @@ one terrain type so that difficulty increases monotonically along rows.</p>
 <p>At environment construction each environment is assigned a random
 starting row within <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">max_init_terrain_level]</span></code>. The
 <code class="docutils literal notranslate"><span class="pre">terrain_levels_vel</span></code> curriculum term promotes or demotes environments
-on each reset based on distance traveled during the episode.
+on each reset based on distance traveled during the episode. The
+distance is judged against the velocity command integrated over the
+episode: a robot moves up once it covers <code class="docutils literal notranslate"><span class="pre">promotion_fraction</span></code> of it
+(capped at half a terrain tile) and moves down if it covers less than
+half.
 Environments that reach the maximum level are randomly reassigned to
 any row, maintaining coverage across all difficulty levels. See
 <a class="reference internal" href="terrain.html#terrain"><span class="std std-ref">Terrain</span></a> for details on configuring the terrain grid itself.</p>
@@ -730,7 +735,7 @@ By The mjlab Developers
   
   <div class="footer-item">
     <p class="last-updated">
-  Last updated on Aug 25, 2026.
+  Last updated on Nov 21, 2026.
   <br/>
 </p>
   </div>

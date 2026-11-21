@@ -59,7 +59,7 @@
     <link rel="prev" title="Heterogeneous Worlds" href="entity/per_world_mesh.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-    <meta name="docbuild:last-update" content="Aug 25, 2026"/>
+    <meta name="docbuild:last-update" content="Nov 21, 2026"/>
   </head>
   
   
@@ -196,6 +196,7 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="sensors/index.html">Sensors</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="sensors/raycast_sensor.html">RayCast Sensor</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sensors/rgbd_camera.html">RGB-D Camera</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sensors/tactile_sensor.html">Tactile Sensor</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="scene.html">Scene</a></li>
@@ -602,8 +603,11 @@ through the native bias path, so <code class="docutils literal notranslate"><spa
 its velocity derivative as effective damping. Three input modes pick what
 <code class="docutils literal notranslate"><span class="pre">ctrl</span></code> carries: VOLTAGE drives the motor directly; POSITION / VELOCITY
 close an internal PID (with anti-windup and slew limiting) against a
-single setpoint, whose Vmax-clamped output becomes torque. POSITION mode
-pins v_target = 0 (the kd term acts on raw velocity). Optional physics:
+single setpoint. The PID gains are in torque space, <code class="docutils literal notranslate"><span class="pre">stiffness</span></code> on the
+position error and <code class="docutils literal notranslate"><span class="pre">damping</span></code> on the velocity error, and the driver
+compensates back-EMF, so the commanded torque is delivered until the drive
+voltage reaches Vmax. POSITION mode pins v_target = 0 (the kd term acts on
+raw velocity). Optional physics:
 inductance,
 thermal model with I^2R heating, cogging ripple, LuGre friction.
 <code class="docutils literal notranslate"><span class="pre">DcMotorActuator</span></code> (the explicit version) is a software PD with a
@@ -886,6 +890,10 @@ joint.</p>
 <span class="sd">    &quot;&quot;&quot;</span>
 </pre></div>
 </div>
+<p>On reset, <code class="docutils literal notranslate"><span class="pre">cmd.reset_env_ids</span></code> selects the environments to initialize; it is
+<code class="docutils literal notranslate"><span class="pre">None</span></code> during physics steps. Command tensors always contain the full batch.
+Stateful <code class="docutils literal notranslate"><span class="pre">compute()</span></code> implementations must backfill only the selected rows
+(e.g. using <code class="docutils literal notranslate"><span class="pre">CircularBuffer.backfill</span></code>), leaving other environments untouched.</p>
 <p><strong>Lifecycle hooks:</strong></p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">edit_spec</span></code>: Modify MjSpec before compilation (add actuators, set
@@ -999,7 +1007,7 @@ By The mjlab Developers
   
   <div class="footer-item">
     <p class="last-updated">
-  Last updated on Aug 25, 2026.
+  Last updated on Nov 21, 2026.
   <br/>
 </p>
   </div>
