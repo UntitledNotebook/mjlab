@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 
 from mjlab.rl import MjlabOnPolicyRunner, RslRlBaseRunnerCfg, RslRlPpoAlgorithmCfg
 
+from .mdp import motion
+
 
 @dataclass
 class TransformerCfg:
@@ -40,6 +42,12 @@ class ScaleTrackRunnerCfg(RslRlBaseRunnerCfg):
 
 
 class ScaleTrackRunner(MjlabOnPolicyRunner):
+  def learn(
+    self, num_learning_iterations: int, init_at_random_ep_len: bool = False
+  ) -> None:
+    motion(self.env.unwrapped).schedule_pool_refresh(self.cfg["num_steps_per_env"])
+    super().learn(num_learning_iterations, init_at_random_ep_len)
+
   def _load_checkpoint(
     self, loaded_dict: dict, load_cfg: dict | None, strict: bool
   ) -> dict:

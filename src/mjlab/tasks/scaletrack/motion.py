@@ -54,51 +54,104 @@ def _motion_entries(path: Path) -> dict[str, tuple[Path, float]]:
   return entries
 
 
+_FIELD_SHAPES = {
+  "joint_pos": (len(JOINT_NAMES),),
+  "joint_vel": (len(JOINT_NAMES),),
+  "body_pos_w": (len(BODY_NAMES), 3),
+  "body_quat_w": (len(BODY_NAMES), 4),
+  "body_lin_vel_w": (len(BODY_NAMES), 3),
+  "body_ang_vel_w": (len(BODY_NAMES), 3),
+}
+_TRACKED_IDS = [BODY_NAMES.index(name) for name in TRACKED_BODIES]
+
+
+def _read_clip(path: Path) -> dict[str, np.ndarray]:
+  with np.load(path) as data:
+    joints = data["joint_pos"]
+    length = len(joints)
+    if data["fps"].item() != 50 or length == 0:
+      raise ValueError(f"{path} must contain a nonempty 50 Hz ScaleTrack motion")
+    clip = {}
+    for key, shape in _FIELD_SHAPES.items():
+      values = joints if key == "joint_pos" else data[key]
+      if values.shape != (length, *shape):
+        raise ValueError(
+          f"{path}: expected {key} shape {(length, *shape)}, got {values.shape}"
+        )
+      if key.startswith("body_"):
+        values = values[:, _TRACKED_IDS]
+      clip[key] = values.astype(np.float32, copy=False)
+  return clip
+
+
 class MotionLibrary:
-  def __init__(self, path: str, device: str):
+  def __init__(self, path: str, device: str, pool_size_mib: int | None = None):
     entries = _motion_entries(Path(path))
-    self.names = list(entries)
+    self._names = list(entries)
+    self._paths = [p for p, _ in entries.values()]
     weights = [weight for _, weight in entries.values()]
     max_weight = max(weights)
     if max_weight == 0:
       raise ValueError(f"{path}: at least one clip must have a positive weight")
-    self._sampling_weights: torch.Tensor | None = None
-    if min(weights) < max_weight:
-      self._sampling_weights = torch.tensor(
-        [w / max_weight for w in weights], dtype=torch.float64, device=device
-      )
-    body_ids = [BODY_NAMES.index(name) for name in TRACKED_BODIES]
-    fields = {
-      "joint_pos": (len(JOINT_NAMES),),
-      "joint_vel": (len(JOINT_NAMES),),
-      "body_pos_w": (len(BODY_NAMES), 3),
-      "body_quat_w": (len(BODY_NAMES), 4),
-      "body_lin_vel_w": (len(BODY_NAMES), 3),
-      "body_ang_vel_w": (len(BODY_NAMES), 3),
-    }
-    clips: dict[str, list[np.ndarray]] = {key: [] for key in fields}
+    self._weights = torch.tensor([w / max_weight for w in weights], dtype=torch.float64)
+    if pool_size_mib is not None and pool_size_mib <= 0:
+      raise ValueError("pool_size_mib must be positive")
+    # Joint and tracked-body data use roughly 1 KiB per frame.
+    self._target_frames = None if pool_size_mib is None else pool_size_mib * 1024
+    self._device = device
+    self.data: dict[str, torch.Tensor] = {}
+    self.refresh()
+
+  def refresh(self) -> None:
+    """Draw whole clips until their estimated size reaches the target."""
+    log_arrivals = None
+    if self._target_frames is None:
+      order = torch.arange(len(self._names))
+    else:
+      eligible = self._weights.nonzero().flatten()
+      rates = self._weights[eligible]
+      # Independent exponential clocks give the order of first occurrences in
+      # repeated weighted draws, without repeatedly opening popular clips.
+      clocks = torch.empty_like(rates).exponential_().log() - rates.log()
+      log_arrivals, permutation = clocks.sort()
+      order = eligible[permutation]
+    clips: dict[str, list[np.ndarray]] = {key: [] for key in _FIELD_SHAPES}
     lengths = []
-    for p, _ in entries.values():
-      with np.load(p) as data:
-        length = len(data["joint_pos"])
-        if data["fps"].item() != 50 or length == 0:
-          raise ValueError(f"{p} must contain a nonempty 50 Hz ScaleTrack motion")
-        for key, shape in fields.items():
-          values = data[key]
-          if values.shape != (length, *shape):
-            raise ValueError(
-              f"{p}: expected {key} shape {(length, *shape)}, got {values.shape}"
-            )
-          if key.startswith("body_"):
-            values = values[:, body_ids]
-          clips[key].append(values)
-        lengths.append(length)
+    total_frames = 0
+    for index in order.tolist():
+      clip = _read_clip(self._paths[index])
+      for key, values in clip.items():
+        clips[key].append(values)
+      lengths.append(len(clip["joint_pos"]))
+      total_frames += lengths[-1]
+      if self._target_frames is not None and total_frames >= self._target_frames:
+        break
+    resident = order[: len(lengths)]
+    subset = len(resident) < len(order)
+    # Another draw order can stop sooner if a long clip was drawn last.
+    self.can_refresh = subset or (
+      self._target_frames is not None
+      and total_frames - min(lengths) >= self._target_frames
+    )
+    weights = self._weights[resident]
+    if subset and log_arrivals is not None:
+      # By cutoff T each clip has one first draw at t, plus w * (T - t)
+      # expected repeats. Divide by T to keep extreme weight ratios finite.
+      first = log_arrivals[: len(resident)]
+      cutoff = first[-1]
+      weights = (-cutoff).exp() - weights * (first - cutoff).expm1()
+    # Release the old frames before transferring the new pool to the GPU.
+    self.data.clear()
     self.data = {
-      key: torch.as_tensor(np.concatenate(values), dtype=torch.float32, device=device)
-      for key, values in clips.items()
+      key: torch.from_numpy(np.concatenate(arrays)).to(self._device)
+      for key, arrays in clips.items()
     }
-    self.lengths = torch.tensor(lengths, device=device)
-    self.starts = self.lengths.cumsum(dim=0) - self.lengths
+    self.names = [self._names[index] for index in resident.tolist()]
+    self.lengths = torch.tensor(lengths, device=self._device)
+    self.starts = self.lengths.cumsum(0) - self.lengths
+    self._sampling_weights = (
+      weights.to(self._device) if weights.min() < weights.max() else None
+    )
 
   def sample_clip_ids(self, count: int) -> torch.Tensor:
     """Draw training clips with replacement."""
@@ -111,6 +164,10 @@ class MotionLibrary:
 @dataclass(kw_only=True)
 class ScaleTrackMotionCfg(FileMotionCommandCfg):
   play: bool = False
+  pool_size_mib: int | None = None
+  """Approximate pool size in MiB. The last clip is kept whole. None loads all clips."""
+  pool_refresh_iterations: int = 100
+  """PPO iterations between replacements of a bounded training pool."""
   mode_index: int | None = None
   """Fixed mode. Training samples one of the eight modes per episode."""
   local_tracking: bool = False
@@ -127,7 +184,13 @@ class ScaleTrackMotion(CommandTerm):
   def __init__(self, cfg: ScaleTrackMotionCfg, env: ManagerBasedRlEnv):
     super().__init__(cfg, env)
     self.robot: Entity = env.scene["robot"]
-    self.library = MotionLibrary(cfg.motion_file, self.device)
+    if cfg.pool_refresh_iterations <= 0:
+      raise ValueError("pool_refresh_iterations must be positive")
+    self.library = MotionLibrary(
+      cfg.motion_file, self.device, None if cfg.play else cfg.pool_size_mib
+    )
+    self._refresh_interval_steps = 0
+    self._next_refresh_step: int | None = None
     self.joint_ids = torch.tensor(
       self.robot.find_joints(JOINT_NAMES, preserve_order=True)[0], device=self.device
     )
@@ -158,6 +221,22 @@ class ScaleTrackMotion(CommandTerm):
       [0, 1, 2, 4, 8, 16, 32], device=self.device
     ).expand(self.num_envs, -1)
     self.metrics["error_body_pos_g"] = torch.zeros(self.num_envs, device=self.device)
+
+  def schedule_pool_refresh(self, num_steps_per_env: int) -> None:
+    if self.library.can_refresh and self._next_refresh_step is None:
+      self._refresh_interval_steps = (
+        self.cfg.pool_refresh_iterations * num_steps_per_env
+      )
+      self._next_refresh_step = (
+        self._env.common_step_counter + self._refresh_interval_steps
+      )
+
+  @property
+  def pool_refresh_due(self) -> bool:
+    return (
+      self._next_refresh_step is not None
+      and self._env.common_step_counter >= self._next_refresh_step
+    )
 
   @property
   def frame(self) -> torch.Tensor:
@@ -195,6 +274,15 @@ class ScaleTrackMotion(CommandTerm):
     )
 
   def _resample_command(self, env_ids: torch.Tensor) -> None:
+    if self.pool_refresh_due:
+      # motion_end has timed out all envs against the old reference.
+      self.library.refresh()
+      self.motion_ids.zero_()
+      self.time_steps.zero_()
+      self.started.zero_()
+      self._next_refresh_step = (
+        self._env.common_step_counter + self._refresh_interval_steps
+      )
     count = len(env_ids)
     ended = self.started[env_ids] & (
       self.time_steps[env_ids] >= self.last_frame[env_ids]

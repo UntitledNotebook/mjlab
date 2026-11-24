@@ -140,6 +140,8 @@ def global_velocity(env: ManagerBasedRlEnv, std: float, angular: bool) -> torch.
 
 def motion_end(env: ManagerBasedRlEnv) -> torch.Tensor:
   cmd = motion(env)
+  if cmd.pool_refresh_due:
+    return torch.ones_like(cmd.started)
   return cmd.time_steps >= cmd.last_frame
 
 
