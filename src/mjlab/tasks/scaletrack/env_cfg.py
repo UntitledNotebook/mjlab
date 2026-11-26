@@ -21,6 +21,7 @@ from .motion import ScaleTrackMotionCfg
 
 def scaletrack_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg = make_tracking_env_cfg()
+  cfg.sim.njmax = 512
   cfg.scene.entities = {"robot": robot_cfg()}
   cfg.viewer.body_name = "pelvis"
   cfg.actions["joint_pos"] = JointPositionActionCfg(
@@ -127,6 +128,9 @@ def scaletrack_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     )
     cfg.terminations["body_pos"] = TerminationTermCfg(
       func=mdp.tracking_failed, params={"threshold": 0.5}
+    )
+    cfg.terminations["nan_term"] = TerminationTermCfg(
+      func=common.nan_detection, time_out=False
     )
     cfg.events["base_com"].params["asset_cfg"] = SceneEntityCfg(
       "robot", body_names="torso_link"

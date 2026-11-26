@@ -12,6 +12,12 @@ Added
   checkpoint and its 50 Hz motion files. See :ref:`scaletrack`.
 - Added per-clip training weights to ScaleTrack motion YAML files.
 
+Fixed
+^^^^^
+
+- Raised ScaleTrack's per-environment constraint limit from 250 to 512. During
+  training, environments with non-finite physics state now terminate and reset.
+
 Version 1.6.0 (August 8, 2026)
 ------------------------------
 
